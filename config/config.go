@@ -68,7 +68,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("no projects configured")
 	}
 
-	for i, proj := range c.Projects {
+	for i := range c.Projects {
+		proj := &c.Projects[i]
 		if proj.Name == "" {
 			return fmt.Errorf("project %d missing name", i)
 		}
@@ -84,13 +85,13 @@ func (c *Config) Validate() error {
 
 		// 设置默认值
 		if proj.COSConfig.Region == "" {
-			c.Projects[i].COSConfig.Region = "ap-shanghai"
+			proj.COSConfig.Region = "ap-shanghai"
 		}
 		if proj.Watcher.PoolSize == 0 {
-			c.Projects[i].Watcher.PoolSize = 5
+			proj.Watcher.PoolSize = 5
 		}
 		if len(proj.Watcher.Events) == 0 {
-			c.Projects[i].Watcher.Events = []string{"create", "write"}
+			proj.Watcher.Events = []string{"create", "write"}
 		}
 	}
 

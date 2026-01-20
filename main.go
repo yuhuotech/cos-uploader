@@ -18,13 +18,20 @@ import (
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "Path to config file")
+	version := flag.Bool("version", false, "Show version information")
 	flag.Parse()
+
+	// 如果指定了 --version，输出版本后退出
+	if *version {
+		println("COS Uploader", Version)
+		os.Exit(0)
+	}
 
 	// 初始化日志
 	log := logger.NewLogger()
 	defer log.Sync()
 
-	log.Info("Starting COS uploader", "config", *configPath)
+	log.Info("Starting COS uploader", "version", Version, "config", *configPath)
 
 	// 加载配置
 	cfg, err := config.LoadConfig(*configPath)

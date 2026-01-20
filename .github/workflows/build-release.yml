@@ -1,0 +1,214 @@
+name: Build Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      draft:
+        description: 'Create as draft release'
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark as prerelease'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - os: linux
+            arch: amd64
+            runner: ubuntu-latest
+            target: linux_amd64
+          - os: linux
+            arch: arm64
+            runner: ubuntu-latest
+            target: linux_arm64
+
+          # macOS builds
+          - os: macos
+            arch: amd64
+            runner: macos-latest-large
+            target: darwin_amd64
+          - os: macos
+            arch: arm64
+            runner: macos-latest
+            target: darwin_arm64
+
+          # Windows builds
+          - os: windows
+            arch: amd64
+            runner: windows-latest
+            target: windows_amd64
+          - os: windows
+            arch: arm64
+            runner: windows-latest
+            target: windows_arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Run tests
+        run: go test ./... -v
+        shell: bash
+
+      - name: Build (Linux/macOS)
+        if: matrix.os != 'windows'
+        run: |
+          mkdir -p release
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build \
+            -ldflags="-s -w -X main.Version=${{ github.event.inputs.version }}" \
+            -o release/cos-uploader
+        shell: bash
+
+      - name: Build (Windows)
+        if: matrix.os == 'windows'
+        run: |
+          mkdir -p release
+          $env:GOOS='windows'
+          $env:GOARCH='${{ matrix.arch }}'
+          go build -ldflags="-s -w -X main.Version=${{ github.event.inputs.version }}" -o release/cos-uploader.exe
+        shell: pwsh
+
+      - name: Create archive (Linux/macOS)
+        if: matrix.os != 'windows'
+        run: |
+          cd release
+          tar -czf cos-uploader-${{ github.event.inputs.version }}-${{ matrix.target }}.tar.gz cos-uploader
+          cd ..
+        shell: bash
+
+      - name: Create archive (Windows)
+        if: matrix.os == 'windows'
+        run: |
+          cd release
+          7z a cos-uploader-${{ github.event.inputs.version }}-${{ matrix.target }}.zip cos-uploader.exe
+          cd ..
+        shell: pwsh
+
+      - name: Upload artifacts (Linux/macOS)
+        if: matrix.os != 'windows'
+        uses: actions/upload-artifact@v3
+        with:
+          name: cos-uploader-${{ github.event.inputs.version }}-${{ matrix.target }}
+          path: release/cos-uploader-${{ github.event.inputs.version }}-${{ matrix.target }}.tar.gz
+          retention-days: 7
+
+      - name: Upload artifacts (Windows)
+        if: matrix.os == 'windows'
+        uses: actions/upload-artifact@v3
+        with:
+          name: cos-uploader-${{ github.event.inputs.version }}-${{ matrix.target }}
+          path: release/cos-uploader-${{ github.event.inputs.version }}-${{ matrix.target }}.zip
+          retention-days: 7
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: release-artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          find release-artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec mv {} release-files/ \;
+          ls -lah release-files/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: Release ${{ github.event.inputs.version }}
+          draft: ${{ github.event.inputs.draft }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: release-files/*
+          body: |
+            # COS File Monitor & Uploader - ${{ github.event.inputs.version }}
+
+            ## Downloads
+
+            Available for:
+            - **Linux**: `cos-uploader-${{ github.event.inputs.version }}-linux_amd64.tar.gz`, `cos-uploader-${{ github.event.inputs.version }}-linux_arm64.tar.gz`
+            - **macOS**: `cos-uploader-${{ github.event.inputs.version }}-darwin_amd64.tar.gz`, `cos-uploader-${{ github.event.inputs.version }}-darwin_arm64.tar.gz`
+            - **Windows**: `cos-uploader-${{ github.event.inputs.version }}-windows_amd64.zip`, `cos-uploader-${{ github.event.inputs.version }}-windows_arm64.zip`
+
+            ## Installation
+
+            ### Linux/macOS
+            ```bash
+            tar -xzf cos-uploader-${{ github.event.inputs.version }}-linux_amd64.tar.gz
+            chmod +x cos-uploader
+            ./cos-uploader -config config.yaml
+            ```
+
+            ### Windows
+            ```powershell
+            Expand-Archive cos-uploader-${{ github.event.inputs.version }}-windows_amd64.zip
+            cd cos-uploader
+            .\cos-uploader.exe -config config.yaml
+            ```
+
+            ## Features
+
+            - Real-time file monitoring with millisecond-level detection
+            - Multi-project and multi-directory support
+            - Concurrent file upload to Tencent Cloud COS
+            - Automatic retry mechanism (up to 3 retries)
+            - DingTalk alert integration
+            - Structured JSON logging
+
+            ## Documentation
+
+            See [README.md](../blob/${{ github.event.inputs.version }}/README.md) for detailed documentation.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Notify Build Status
+    runs-on: ubuntu-latest
+    needs: [build, create-release]
+    if: always()
+
+    steps:
+      - name: Build Status Summary
+        run: |
+          echo "## Build Status Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: ${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release**: ${{ needs.create-release.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Builds Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Linux (amd64)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Linux (arm64)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ macOS (amd64)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ macOS (arm64)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Windows (amd64)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Windows (arm64)" >> $GITHUB_STEP_SUMMARY

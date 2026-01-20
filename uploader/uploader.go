@@ -316,7 +316,6 @@ func (u *Uploader) ExecuteFullUpload(projectName string) (*FullUploadStats, erro
 			u.logger.Error("File upload failed", "file", localPath, "error", err)
 			failureCount++
 		} else {
-			u.logger.Info("File uploaded", "file", localPath)
 			successCount++
 			stats.UploadedSize += entry.Size
 			// 更新本地索引为已上传状态

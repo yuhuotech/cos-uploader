@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 func main() {
 	configPath := flag.String("config", "config.yaml", "Path to config file")
 	version := flag.Bool("version", false, "Show version information")
+	fullUpload := flag.String("full-upload", "", "Execute full upload for specified project")
 	flag.Parse()
 
 	// 如果指定了 --version，输出版本后退出
@@ -47,6 +49,33 @@ func main() {
 	if err != nil {
 		log.Error("Failed to create uploader", "error", err)
 		os.Exit(1)
+	}
+
+	// 如果指定了全量上传，执行后退出
+	if *fullUpload != "" {
+		log.Info("Executing full upload", "project", *fullUpload)
+		stats, err := uploaderSvc.ExecuteFullUpload(*fullUpload)
+		if err != nil {
+			log.Error("Full upload failed", "project", *fullUpload, "error", err)
+			os.Exit(1)
+		}
+
+		// 打印统计报告
+		println("")
+		println("=" + strings.Repeat("=", 78) + "=")
+		println("Full Upload Report")
+		println("=" + strings.Repeat("=", 78) + "=")
+		println(fmt.Sprintf("Project:       %s", stats.ProjectName))
+		println(fmt.Sprintf("Total Files:   %d", stats.TotalFiles))
+		println(fmt.Sprintf("Uploaded:      %d", stats.UploadedFiles))
+		println(fmt.Sprintf("Skipped:       %d", stats.SkippedFiles))
+		println(fmt.Sprintf("Failed:        %d", stats.FailedFiles))
+		println(fmt.Sprintf("Total Size:    %s", uploaderModule.FormatBytes(stats.TotalSize)))
+		println(fmt.Sprintf("Upload Size:   %s", uploaderModule.FormatBytes(stats.UploadedSize)))
+		println(fmt.Sprintf("Duration:      %s", stats.Duration.String()))
+		println("=" + strings.Repeat("=", 78) + "=")
+
+		os.Exit(0)
 	}
 
 	// 创建报警器

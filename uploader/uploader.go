@@ -217,3 +217,168 @@ func (wp *WorkerPool) Stop() {
 	close(wp.tasks)
 	wp.wg.Wait()
 }
+
+// FullUploadStats 全量上传统计信息
+type FullUploadStats struct {
+	ProjectName      string
+	TotalFiles       int64
+	UploadedFiles    int64
+	SkippedFiles     int64
+	FailedFiles      int64
+	TotalSize        int64
+	UploadedSize     int64
+	Duration         time.Duration
+}
+
+// ExecuteFullUpload 执行全量上传
+// 返回统计信息和任何致命错误
+func (u *Uploader) ExecuteFullUpload(projectName string) (*FullUploadStats, error) {
+	startTime := time.Now()
+	stats := &FullUploadStats{
+		ProjectName: projectName,
+	}
+
+	// 获取项目配置
+	projectConfig, ok := u.configs[projectName]
+	if !ok {
+		return nil, fmt.Errorf("project '%s' not found", projectName)
+	}
+
+	u.logger.Info("Starting full upload", "project", projectName)
+
+	// 创建索引管理器
+	cosClient, ok := u.clients[projectName]
+	if !ok {
+		return nil, fmt.Errorf("COS client not found for project '%s'", projectName)
+	}
+	indexManager := NewIndexManager(cosClient, &projectConfig.COSConfig, u.logger)
+
+	// 创建扫描器
+	scanner := NewDirectoryScanner(projectConfig, indexManager, u.logger)
+
+	// Step 1: 扫描本地目录，生成本地索引
+	u.logger.Info("Step 1: Scanning local directories", "project", projectName)
+	localIdx, err := scanner.ScanDirectories()
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan directories: %w", err)
+	}
+
+	stats.TotalFiles = int64(len(localIdx.Files))
+	for _, entry := range localIdx.Files {
+		stats.TotalSize += entry.Size
+	}
+
+	// 保存本地索引
+	localIndexPath := GetLocalIndexPath(projectName)
+	if err := localIdx.SaveToFile(localIndexPath); err != nil {
+		u.logger.Warn("Failed to save local index", "error", err)
+	} else {
+		u.logger.Info("Local index saved", "path", localIndexPath)
+	}
+
+	// Step 2: 下载远程索引
+	u.logger.Info("Step 2: Downloading remote index", "project", projectName)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	remoteIdx, err := indexManager.DownloadRemoteIndex(ctx, projectName)
+	cancel()
+	if err != nil {
+		u.logger.Warn("Failed to download remote index, will proceed anyway", "error", err)
+		remoteIdx = NewFileIndex()
+	}
+
+	// Step 3: 对比索引，确定需要上传的文件
+	u.logger.Info("Step 3: Analyzing files for upload", "project", projectName)
+	filesToUpload, skipped := scanner.AnalyzeForUpload(localIdx, remoteIdx)
+	stats.SkippedFiles = skipped
+
+	if len(filesToUpload) == 0 {
+		u.logger.Info("No files need to be uploaded", "project", projectName, "skipped", skipped)
+		stats.Duration = time.Since(startTime)
+		return stats, nil
+	}
+
+	// Step 4: 上传需要的文件
+	u.logger.Info("Step 4: Starting file uploads", "project", projectName, "count", len(filesToUpload))
+	successCount := 0
+	failureCount := 0
+
+	for localPath, entry := range filesToUpload {
+		task := &UploadTask{
+			FilePath:    localPath,
+			RemotePath:  entry.RemotePath,
+			ProjectName: projectName,
+			Retry:       0,
+		}
+
+		// 上传文件（同步，带重试）
+		err := u.uploadFileWithRetry(task, 3)
+		if err != nil {
+			u.logger.Error("File upload failed", "file", localPath, "error", err)
+			failureCount++
+		} else {
+			u.logger.Info("File uploaded", "file", localPath)
+			successCount++
+			stats.UploadedSize += entry.Size
+			// 更新本地索引为已上传状态
+			localIdx.Files[localPath].UploadedTime = time.Now().UTC().Format(time.RFC3339)
+		}
+	}
+
+	stats.UploadedFiles = int64(successCount)
+	stats.FailedFiles = int64(failureCount)
+
+	// Step 5: 更新远程索引
+	u.logger.Info("Step 5: Updating remote index", "project", projectName)
+	UpdateRemoteIndexWithUploads(remoteIdx, filesToUpload)
+
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	err = indexManager.UploadRemoteIndex(ctx, remoteIdx, projectName)
+	cancel()
+	if err != nil {
+		u.logger.Warn("Failed to upload remote index", "error", err)
+	}
+
+	// 再次保存本地索引（带上传状态）
+	if err := localIdx.SaveToFile(localIndexPath); err != nil {
+		u.logger.Warn("Failed to save updated local index", "error", err)
+	}
+
+	stats.Duration = time.Since(startTime)
+
+	// 输出统计报告
+	u.logger.Info("Full upload completed",
+		"project", projectName,
+		"total_files", stats.TotalFiles,
+		"uploaded", stats.UploadedFiles,
+		"skipped", stats.SkippedFiles,
+		"failed", stats.FailedFiles,
+		"total_size", FormatBytes(stats.TotalSize),
+		"uploaded_size", FormatBytes(stats.UploadedSize),
+		"duration", stats.Duration.String())
+
+	return stats, nil
+}
+
+// uploadFileWithRetry 上传文件并重试指定次数
+func (u *Uploader) uploadFileWithRetry(task *UploadTask, maxRetries int) error {
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		err := u.UploadFile(task)
+		if err == nil {
+			return nil
+		}
+
+		if attempt < maxRetries-1 {
+			// 指数退避重试
+			waitTime := time.Duration(1<<uint(attempt)) * time.Second
+			u.logger.Warn("Upload failed, retrying",
+				"file", task.FilePath,
+				"attempt", attempt+1,
+				"max_attempts", maxRetries,
+				"wait", waitTime.String(),
+				"error", err)
+			time.Sleep(waitTime)
+		}
+	}
+
+	return fmt.Errorf("upload failed after %d attempts", maxRetries)
+}

@@ -9,7 +9,21 @@
       "Bash(go mod download:*)",
       "Bash(go mod tidy:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(tree:*)",
+      "Bash(go mod graph:*)",
+      "Bash(go list:*)",
+      "Bash(go test:*)",
+      "Bash(go tool cover:*)",
+      "Bash(gofmt:*)",
+      "Bash(go vet:*)",
+      "Bash(go tool vet:*)",
+      "Skill(verification-before-completion)",
+      "Bash(go build:*)",
+      "Bash(go fmt:*)",
+      "Bash(go run:*)",
+      "Bash(go doc:*)",
+      "Bash(grep:*)"
     ]
   }
 }

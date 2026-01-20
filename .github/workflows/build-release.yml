@@ -27,30 +27,36 @@ jobs:
         include:
           # Linux builds
           - os: linux
+            goos: linux
             arch: amd64
             runner: ubuntu-latest
             target: linux_amd64
           - os: linux
+            goos: linux
             arch: arm64
             runner: ubuntu-latest
             target: linux_arm64
 
           # macOS builds
           - os: macos
+            goos: darwin
             arch: amd64
             runner: macos-latest
             target: darwin_amd64
           - os: macos
+            goos: darwin
             arch: arm64
             runner: macos-latest
             target: darwin_arm64
 
           # Windows builds
           - os: windows
+            goos: windows
             arch: amd64
             runner: windows-latest
             target: windows_amd64
           - os: windows
+            goos: windows
             arch: arm64
             runner: windows-latest
             target: windows_arm64
@@ -73,7 +79,7 @@ jobs:
         if: matrix.os != 'windows'
         run: |
           mkdir -p release
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build \
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.arch }} go build \
             -ldflags="-s -w -X main.Version=${{ github.event.inputs.version }}" \
             -o release/cos-uploader
         shell: bash
@@ -82,7 +88,7 @@ jobs:
         if: matrix.os == 'windows'
         run: |
           mkdir -p release
-          $env:GOOS='windows'
+          $env:GOOS='${{ matrix.goos }}'
           $env:GOARCH='${{ matrix.arch }}'
           go build -ldflags="-s -w -X main.Version=${{ github.event.inputs.version }}" -o release/cos-uploader.exe
         shell: pwsh

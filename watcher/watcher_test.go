@@ -1,21 +1,21 @@
 package watcher
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/hmw/cos-uploader/logger"
-	"go.uber.org/zap"
 )
 
 func TestNewWatcher(t *testing.T) {
 	// 创建临时目录
 	tmpDir := t.TempDir()
 
-	// 创建一个mock logger
-	zapLogger := zap.NewNop()
-	log := &logger.Logger{zapLogger.Sugar()}
+	// 创建一个mock logger（使用io.Discard来避免输出）
+	log := &logger.Logger{}
+	log.SetWriter(io.Discard, io.Discard)
 	watcher, err := NewWatcher([]string{tmpDir}, []string{"create", "write"}, log)
 	if err != nil {
 		t.Fatalf("Failed to create watcher: %v", err)
@@ -62,9 +62,9 @@ func TestShouldWatch(t *testing.T) {
 func TestIsInWatchedDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// 创建一个mock logger
-	zapLogger := zap.NewNop()
-	log := &logger.Logger{zapLogger.Sugar()}
+	// 创建一个mock logger（使用io.Discard来避免输出）
+	log := &logger.Logger{}
+	log.SetWriter(io.Discard, io.Discard)
 
 	watcher, err := NewWatcher([]string{tmpDir}, []string{"create"}, log)
 	if err != nil {

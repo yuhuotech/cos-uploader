@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -25,6 +26,8 @@ type Watcher struct {
 	eventsChan  chan Event
 	logger      *logger.Logger
 	done        chan struct{}
+	mu          sync.Mutex // 保护closed字段的并发访问
+	closed      bool       // 标记watcher是否已关闭
 }
 
 // NewWatcher 创建新的文件监听器
@@ -138,8 +141,17 @@ func (w *Watcher) Events() <-chan Event {
 
 // Close 关闭监听器
 func (w *Watcher) Close() error {
+	w.mu.Lock()
+	if w.closed {
+		w.mu.Unlock()
+		return nil
+	}
+	w.closed = true
+	w.mu.Unlock()
+
 	close(w.done)
-	close(w.eventsChan)
+	// 给goroutine时间退出
+	time.Sleep(100 * time.Millisecond)
 	return w.watcher.Close()
 }
 

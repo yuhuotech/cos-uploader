@@ -1,0 +1,38 @@
+projects:
+  - name: project1
+    directories:
+      - /path/to/local/dir1
+      - /path/to/local/dir2
+    cos:
+      secret_id: ${COS_SECRET_ID}
+      secret_key: ${COS_SECRET_KEY}
+      region: ap-shanghai
+      bucket: my-bucket
+      path_prefix: uploads/project1/
+    watcher:
+      events:
+        - create
+        - write
+      pool_size: 5
+    alert:
+      dingtalk_webhook: https://oapi.dingtalk.com/robot/send?access_token=YOUR_TOKEN
+      enabled: true
+
+  - name: project2
+    directories:
+      - /path/to/another/dir
+    cos:
+      secret_id: ${COS_SECRET_ID}
+      secret_key: ${COS_SECRET_KEY}
+      region: ap-shanghai
+      bucket: my-bucket
+      path_prefix: uploads/project2/
+    watcher:
+      events:
+        - create
+        - write
+        - remove
+      pool_size: 3
+    alert:
+      dingtalk_webhook: https://oapi.dingtalk.com/robot/send?access_token=YOUR_TOKEN
+      enabled: true

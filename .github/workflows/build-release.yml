@@ -38,7 +38,7 @@ jobs:
           # macOS builds
           - os: macos
             arch: amd64
-            runner: macos-latest-large
+            runner: macos-latest
             target: darwin_amd64
           - os: macos
             arch: arm64

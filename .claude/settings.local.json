@@ -23,7 +23,9 @@
       "Bash(go fmt:*)",
       "Bash(go run:*)",
       "Bash(go doc:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(chmod:*)",
+      "Bash(./build-all.sh:*)"
     ]
   }
 }

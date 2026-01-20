@@ -1,6 +1,0 @@
-{"level":"warn","time":"2026-01-20T19:25:26.882+0800","caller":"logger/logger.go:74","message":"DingTalk webhook not configured, alert not sent","title":"Test"}
-{"level":"warn","time":"2026-01-20T19:25:26.883+0800","caller":"logger/logger.go:74","message":"DingTalk webhook not configured, alert not sent","title":"COS Upload Failed"}
-{"level":"warn","time":"2026-01-20T19:31:06.838+0800","caller":"logger/logger.go:74","message":"DingTalk webhook not configured, alert not sent","title":"Test"}
-{"level":"warn","time":"2026-01-20T19:31:06.839+0800","caller":"logger/logger.go:74","message":"DingTalk webhook not configured, alert not sent","title":"COS Upload Failed"}
-{"level":"warn","time":"2026-01-20T19:31:31.382+0800","caller":"logger/logger.go:74","message":"DingTalk webhook not configured, alert not sent","title":"Test"}
-{"level":"warn","time":"2026-01-20T19:31:31.383+0800","caller":"logger/logger.go:74","message":"DingTalk webhook not configured, alert not sent","title":"COS Upload Failed"}

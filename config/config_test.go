@@ -86,6 +86,70 @@ func TestValidateConfig(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "missing secret_id",
+			config: &Config{
+				Projects: []ProjectConfig{
+					{
+						Name:        "test",
+						Directories: []string{"/tmp"},
+						COSConfig: COSConfig{
+							SecretKey: "key",
+							Bucket:    "bucket",
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing secret_key",
+			config: &Config{
+				Projects: []ProjectConfig{
+					{
+						Name:        "test",
+						Directories: []string{"/tmp"},
+						COSConfig: COSConfig{
+							SecretID: "id",
+							Bucket:   "bucket",
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing directories",
+			config: &Config{
+				Projects: []ProjectConfig{
+					{
+						Name: "test",
+						COSConfig: COSConfig{
+							SecretID:  "id",
+							SecretKey: "key",
+							Bucket:    "bucket",
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing name",
+			config: &Config{
+				Projects: []ProjectConfig{
+					{
+						Directories: []string{"/tmp"},
+						COSConfig: COSConfig{
+							SecretID:  "id",
+							SecretKey: "key",
+							Bucket:    "bucket",
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -95,5 +159,37 @@ func TestValidateConfig(t *testing.T) {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestLoadConfigFileNotFound(t *testing.T) {
+	cfg, err := LoadConfig("/nonexistent/path/config.yaml")
+	if err == nil {
+		t.Fatal("Expected error for nonexistent file, got nil")
+	}
+	if cfg != nil {
+		t.Errorf("Expected nil config, got %v", cfg)
+	}
+}
+
+func TestLoadConfigInvalidYAML(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "config*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// 写入无效的YAML
+	if _, err := tmpFile.WriteString("invalid: yaml: format: ["); err != nil {
+		t.Fatal(err)
+	}
+	tmpFile.Close()
+
+	cfg, err := LoadConfig(tmpFile.Name())
+	if err == nil {
+		t.Fatal("Expected error for invalid YAML, got nil")
+	}
+	if cfg != nil {
+		t.Errorf("Expected nil config, got %v", cfg)
 	}
 }

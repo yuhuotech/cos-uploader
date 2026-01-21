@@ -173,9 +173,14 @@ func (w *Watcher) Close() error {
 	w.closed = true
 	w.mu.Unlock()
 
+	// 关闭done通道，使Start中的goroutine退出
 	close(w.done)
 	// 给goroutine时间退出
 	time.Sleep(100 * time.Millisecond)
+
+	// 关闭eventsChan，使main中的range循环能够结束
+	close(w.eventsChan)
+
 	return w.watcher.Close()
 }
 

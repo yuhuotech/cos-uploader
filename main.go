@@ -29,19 +29,23 @@ func main() {
 		os.Exit(0)
 	}
 
-	// 初始化日志
-	log := logger.NewLogger()
-	defer log.Sync()
-
-	log.Info("Starting COS uploader", "version", Version, "config", *configPath)
-
 	// 加载配置
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
-		log.Error("Failed to load config", "error", err)
+		println("Failed to load config:", err)
 		os.Exit(1)
 	}
 
+	// 初始化日志（使用配置中的日志路径，或默认路径）
+	var log *logger.Logger
+	if cfg.LogPath != "" {
+		log = logger.NewLoggerWithPath(cfg.LogPath)
+	} else {
+		log = logger.NewLogger()
+	}
+	defer log.Sync()
+
+	log.Info("Starting COS uploader", "version", Version, "config", *configPath)
 	log.Info("Config loaded successfully", "projects", len(cfg.Projects))
 
 	// 创建上传器

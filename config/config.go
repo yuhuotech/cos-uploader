@@ -10,6 +10,7 @@ import (
 // Config 全局配置
 type Config struct {
 	Projects []ProjectConfig `yaml:"projects"`
+	LogPath  string          `yaml:"log_path"` // 日志文件路径，默认: logs/cos-uploader.log
 }
 
 // ProjectConfig 项目配置

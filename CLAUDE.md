@@ -39,12 +39,12 @@ User Input (config.yaml)
 
 ### Module Responsibilities
 
-- **config**: YAML parsing, validation, default value assignment. Located in `config/`
-- **watcher**: fsnotify integration, event filtering, multi-directory support. Located in `watcher/`
-- **uploader**: Task queue (unbuffered channels), worker pool (goroutines), COS SDK integration. Located in `uploader/`
-- **logger**: Dual output (stdout + file), JSON format via zap. Located in `logger/`
+- **config**: YAML parsing, validation, default value assignment, log_path configuration. Located in `config/`
+- **watcher**: fsnotify integration, event filtering, multi-directory support, recursive directory monitoring. Located in `watcher/`
+- **uploader**: Task queue (1000 buffered channels), worker pool (goroutines), COS SDK integration. Located in `uploader/`
+- **logger**: Flexible logging with customizable file paths, dual output (stdout + file), structured format. Located in `logger/`
 - **alert**: HTTP POST to DingTalk webhooks. Located in `alert/`
-- **main**: Lifecycle orchestration, signal handling (SIGINT/SIGTERM), goroutine coordination via WaitGroup
+- **main**: Lifecycle orchestration, signal handling (SIGINT/SIGTERM), goroutine coordination via WaitGroup, config-driven logging initialization
 
 ## Development Commands
 
@@ -191,11 +191,14 @@ The application uses Go's concurrency primitives extensively. Key patterns to un
 ### Logger Module
 **File**: `logger/logger.go`
 
-- Uses Uber's `zap` library for structured JSON logging
-- Dual output: stdout (INFO+) and `logs/cos-uploader.log` (DEBUG+)
-- Wraps `zap.SugaredLogger` for convenience methods (Info, Error, Warn, Debug)
-- Automatically creates `logs/` directory
-- **Testing**: 80% coverage; verifies directory/file creation
+- Flexible structured logging with customizable file paths (NEW in v1.0.1)
+- Dual output: stdout (INFO+) and file (DEBUG+)
+- Two initialization methods:
+  - `NewLogger()`: Uses default path `logs/cos-uploader.log` (backward compatible)
+  - `NewLoggerWithPath(logPath string)`: Uses custom path from config (NEW)
+- Automatically creates log directories as needed
+- Supports both absolute paths (`/opt/cos-uploader/logs/app.log`) and relative paths (`logs/app.log`)
+- **Testing**: 80% coverage; verifies directory/file creation and custom path handling
 
 ### Alert Module
 **File**: `alert/alert.go`
@@ -207,27 +210,39 @@ The application uses Go's concurrency primitives extensively. Key patterns to un
 
 ## Gotchas & Common Issues
 
-### 1. Race Conditions
-- **Issue**: Watcher's `Close()` method had race condition when closing eventsChan
+### 1. Event Channel Closure (FIXED in v1.0.1)
+- **Issue**: Watcher's `Close()` method did not close `eventsChan`, causing main event loop to hang indefinitely
+- **Symptom**: Application would not shut down gracefully; LaunchAgent on macOS would repeatedly restart it
+- **Fix**: Added `close(w.eventsChan)` in watcher `Close()` method to allow main loop's range statement to terminate
+- **Lesson**: Always close send channels from the sender side when multiple goroutines are involved
+
+### 2. Race Conditions
+- **Issue**: Original implementation had potential race condition during shutdown
 - **Fix**: Added `sync.Mutex` with `closed` flag; waits 100ms for goroutine to exit before closing resources
 - **Lesson**: Always use mutex for state flags accessed from multiple goroutines
 
-### 2. Event Deduplication
+### 3. Event Deduplication
 - **Current**: No deduplication; rapid writes may generate multiple events per file
 - **Consideration**: High-frequency file writes (e.g., log files) may cause upload spam
 - **Future Enhancement**: Add event aggregation/batching
 
-### 3. Symlinks and Directory Traversal
-- **Issue**: `addRecursive()` currently simplified; doesn't walk subdirectories
-- **Current Behavior**: Only monitors top-level directories, not subdirs
-- **Future Enhancement**: Walk file tree to monitor nested changes
+### 4. Symlinks and Directory Traversal
+- **Status**: RESOLVED in v1.0.0+
+- **Implementation**: `addRecursive()` now uses `filepath.Walk()` to monitor all subdirectories
+- **Behavior**: Recursively monitors all nested directories automatically
 
-### 4. COS SDK Error Handling
+### 5. COS SDK Error Handling
 - **Issue**: SDK may return non-EOF errors without proper context
 - **Current**: Wraps errors with `fmt.Errorf` for context
 - **Testing**: Limited COS integration tests (requires credentials, network)
 
-### 5. Version Injection
+### 6. Configurable Log Paths (NEW in v1.0.1)
+- **Feature**: Applications now support custom log file paths via `log_path` in config.yaml
+- **Implementation**: `logger.NewLoggerWithPath()` creates logger at specified path
+- **Benefit**: Centralized logging directory, easier maintenance
+- **Example**: `log_path: /opt/cos-uploader/logs/cos-uploader.log`
+
+### 7. Version Injection
 - **Build**: Compile with `-ldflags="-X main.Version=v1.0.0"`
 - **Default**: If not injected, `Version = "dev"` (see `version.go`)
 - **CLI**: Use `./cos-uploader --version` to verify
@@ -250,14 +265,27 @@ The application uses Go's concurrency primitives extensively. Key patterns to un
 
 ## Deployment & Operations
 
-### Systemd Service
+### Recommended Directory Structure
+
+```
+/opt/cos-uploader/
+├── cos-uploader           # Application binary
+├── config.yaml            # Configuration file (includes log_path)
+└── logs/
+    └── cos-uploader.log   # Application logs
+```
+
+This structure centralizes all application files for easy management.
+
+### Systemd Service (Linux)
 **File**: `cos-uploader.service`
 
 - Type: `simple` (foreground process, no daemonization)
 - User: `ubuntu` (update as needed)
 - ExecStart: `/opt/cos-uploader/cos-uploader -config /opt/cos-uploader/config.yaml`
+- WorkingDirectory: `/opt/cos-uploader`
 - Restart: `always` with 10-second backoff
-- Logs: Redirected to `/var/log/cos-uploader/`
+- Logs: Managed by application (see config.yaml `log_path`), also captured by systemd journal
 - Installation: `sudo cp cos-uploader.service /etc/systemd/system/` → `sudo systemctl daemon-reload` → `sudo systemctl enable --now cos-uploader`
 
 ### GitHub Actions
@@ -297,8 +325,18 @@ All dependencies should be stable; breaking changes require major version bump.
 
 ## Documentation Files
 
-- `README.md`: User-facing feature overview and quick start
-- `BUILD_GUIDE.md`: Local build instructions, GoReleaser usage
+- `README.md`: User-facing feature overview, quick start, and configuration guide
+- `MACOS_BACKGROUND_SETUP.md`: Complete macOS LaunchAgent setup and troubleshooting guide
+- `BUILD_GUIDE.md`: Local build instructions, cross-compilation, GoReleaser usage
+- `CHANGELOG.md`: Version history, features, bug fixes, and migration guides
 - `GITHUB_WORKFLOW_GUIDE.md`: GitHub Actions workflow details
 - `RELEASE_WORKFLOW_README.md`: Complete release process guide
+- `CLAUDE.md`: This file - development guide and architecture for Claude Code
 - `docs/plans/2026-01-20-cos-uploader-implementation.md`: Implementation architecture and task breakdown
+
+### Recent Documentation Updates (v1.0.1)
+
+- **MACOS_BACKGROUND_SETUP.md**: Completely rewritten for `/opt/cos-uploader/` directory structure and log configuration
+- **README.md**: Added `log_path` configuration documentation and directory structure guide
+- **CLAUDE.md**: Updated with v1.0.1 changes, including eventsChan fix and log configuration
+- **CHANGELOG.md**: Created to track version history and migration guides

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -14,13 +15,24 @@ type Logger struct {
 	file   io.Writer
 }
 
-// NewLogger 创建新的日志记录器，同时输出到stdout和文件
+// NewLogger 创建新的日志记录器（使用默认路径）
 func NewLogger() *Logger {
+	return NewLoggerWithPath("logs/cos-uploader.log")
+}
+
+// NewLoggerWithPath 创建新的日志记录器，同时输出到stdout和指定的文件路径
+func NewLoggerWithPath(logPath string) *Logger {
+	// 如果路径为空，使用默认路径
+	if logPath == "" {
+		logPath = "logs/cos-uploader.log"
+	}
+
 	// 创建日志目录
-	os.MkdirAll("logs", 0755)
+	logDir := filepath.Dir(logPath)
+	os.MkdirAll(logDir, 0755)
 
 	// 打开日志文件
-	logFile, err := os.OpenFile("logs/cos-uploader.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to open log file: %v", err))
 	}

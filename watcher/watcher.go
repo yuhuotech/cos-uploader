@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -57,14 +58,37 @@ func NewWatcher(directories []string, watchEvents []string, log *logger.Logger) 
 	return w, nil
 }
 
-// addRecursive 递归添加目录和子目录
+// addRecursive 递归添加目录和所有子目录
 func (w *Watcher) addRecursive(dir string) error {
-	// 这里简化处理，实际应该遍历所有子目录
-	// 为了演示，先添加顶级目录
+	// 先添加顶级目录
 	if err := w.watcher.Add(dir); err != nil {
 		return fmt.Errorf("failed to watch directory %s: %w", dir, err)
 	}
 	w.logger.Debug("Watching directory", "path", dir)
+
+	// 遍历所有子目录并添加到监听
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// 只添加目录到监听器
+		if info.IsDir() && path != dir {
+			if err := w.watcher.Add(path); err != nil {
+				w.logger.Debug("Failed to watch subdirectory", "path", path, "error", err)
+				// 继续处理其他目录，不中断遍历
+				return nil
+			}
+			w.logger.Debug("Watching subdirectory", "path", path)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to walk directory %s: %w", dir, err)
+	}
+
 	return nil
 }
 

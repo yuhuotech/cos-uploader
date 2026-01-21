@@ -25,7 +25,8 @@
       "Bash(go doc:*)",
       "Bash(grep:*)",
       "Bash(chmod:*)",
-      "Bash(./build-all.sh:*)"
+      "Bash(./build-all.sh:*)",
+      "Bash(__NEW_LINE_030779d2d4666334__ go build -o ~/bin/cos-uploader .)"
     ]
   }
 }

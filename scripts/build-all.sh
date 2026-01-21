@@ -4,6 +4,14 @@
 
 set -e
 
+# 获取脚本所在目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 项目根目录（脚本的父目录）
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# 切换到项目根目录
+cd "$PROJECT_ROOT"
+
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -15,11 +23,13 @@ VERSION=${1:-v1.0.0}
 
 echo -e "${YELLOW}=== COS Uploader 交叉编译脚本 ===${NC}\n"
 echo "版本: $VERSION"
-echo "编译目录: ./release"
+echo "项目根目录: $PROJECT_ROOT"
+echo "编译目录: $PROJECT_ROOT/release"
 echo ""
 
 # 创建release目录
-mkdir -p release
+RELEASE_DIR="$PROJECT_ROOT/release"
+mkdir -p "$RELEASE_DIR"
 
 # 定义编译目标
 TARGETS=(
@@ -42,9 +52,9 @@ for TARGET in "${TARGETS[@]}"; do
 
   # 确定输出文件名
   if [ "$OS" == "windows" ]; then
-    OUTPUT="release/cos-uploader-${VERSION}-${NAME}.exe"
+    OUTPUT="$RELEASE_DIR/cos-uploader-${VERSION}-${NAME}.exe"
   else
-    OUTPUT="release/cos-uploader-${VERSION}-${NAME}"
+    OUTPUT="$RELEASE_DIR/cos-uploader-${VERSION}-${NAME}"
   fi
 
   echo -ne "${YELLOW}[编译中]${NC} $OS/$ARCH ... "
@@ -71,13 +81,13 @@ echo ""
 
 # 列出编译结果
 echo -e "${YELLOW}=== 编译结果 ===${NC}"
-ls -lh release/cos-uploader-${VERSION}-*
+ls -lh "$RELEASE_DIR"/cos-uploader-${VERSION}-* 2>/dev/null || echo "没有编译成功的文件"
 
 # 可选：创建压缩包
 echo ""
 echo -e "${YELLOW}=== 创建压缩包 ===${NC}"
 
-cd release
+cd "$RELEASE_DIR"
 
 for TARGET in "${TARGETS[@]}"; do
   IFS=':' read -r OS ARCH NAME <<< "$TARGET"

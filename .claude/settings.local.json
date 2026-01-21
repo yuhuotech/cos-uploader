@@ -26,7 +26,14 @@
       "Bash(grep:*)",
       "Bash(chmod:*)",
       "Bash(./build-all.sh:*)",
-      "Bash(__NEW_LINE_030779d2d4666334__ go build -o ~/bin/cos-uploader .)"
+      "Bash(__NEW_LINE_030779d2d4666334__ go build -o ~/bin/cos-uploader .)",
+      "Bash(launchctl list:*)",
+      "Bash(launchctl stop:*)",
+      "Bash(killall:*)",
+      "Bash(launchctl unload:*)",
+      "Bash(/tmp/cos-uploader-test --version)",
+      "Bash(launchctl load:*)",
+      "Bash(/tmp/cos-uploader-new:*)"
     ]
   }
 }

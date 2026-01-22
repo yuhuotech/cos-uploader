@@ -1,23 +1,30 @@
-# COS File Monitor & Uploader
+# COS 文件监控上传工具
 
-A high-performance Go-based file monitoring and automatic upload tool for Tencent Cloud COS (Object Storage Service).
+一个高性能的 Go 应用，实时监控本地文件系统变化并自动上传修改的文件到腾讯云对象存储（COS）。
 
-## Features
+## ✨ 特性
 
-- **Real-time File Monitoring**: Millisecond-level detection of file changes using fsnotify
-- **Multi-project Support**: Configure and manage multiple projects with separate COS buckets
-- **Multi-directory Monitoring**: Each project can monitor multiple local directories
-- **Recursive Directory Monitoring**: Automatically monitors all subdirectories
-- **Concurrent Upload**: Configurable worker pool for parallel file uploads (default: 5 workers)
-- **Automatic Retry**: Retry failed uploads up to 3 times with exponential backoff
-- **Configurable Logging**: Customizable log file path via configuration
-- **DingTalk Alert**: Send failure notifications via DingTalk robot
-- **Comprehensive Logging**: Dual output to stdout and log files with structured format
-- **Graceful Shutdown**: Handle OS signals for clean application termination
+- **实时文件监控**：使用 fsnotify 实现毫秒级文件变化检测
+- **多项目支持**：配置和管理多个项目，每个项目拥有独立的 COS 桶
+- **多目录监控**：每个项目可监控多个本地目录
+- **递归目录监控**：自动监控所有子目录
+- **并发上传**：可配置的工作池实现并行上传（默认 5 个工作线程）
+- **自动重试**：失败的上传最多重试 3 次，具备指数退避机制
+- **灵活日志配置**：通过配置文件自定义日志文件路径
+- **钉钉告警**：上传失败时通过钉钉机器人推送通知
+- **结构化日志**：支持同时输出到标准输出和日志文件
+- **优雅停机**：正确处理操作系统信号实现干净的应用关闭
 
-## Quick Start
+## 📦 安装
 
-### Installation
+### 系统要求
+
+- Go 1.21 或更高版本
+- 可访问腾讯云 COS API 的网络连接
+- （可选）钉钉工作空间用于告警
+- （可选）systemd (Linux) 或 LaunchAgent (macOS) 用于后台运行
+
+### 快速安装
 
 ```bash
 cd cos-uploader
@@ -25,9 +32,15 @@ go mod download
 go build -o cos-uploader
 ```
 
-### Configuration
+### 从源码编译
 
-Create a `config.yaml` file:
+更多编译选项参见 [BUILD_GUIDE.md](./docs/BUILD_GUIDE.md)。
+
+## 🚀 快速开始
+
+### 1. 创建配置文件
+
+创建 `config.yaml` 文件：
 
 ```yaml
 # 日志文件路径（可选，不配置时默认为 logs/cos-uploader.log）
@@ -73,157 +86,192 @@ projects:
       enabled: true
 ```
 
-### Usage
+### 2. 启动运行
 
 ```bash
-# Run with default config.yaml
+# 使用默认的 config.yaml 运行
 ./cos-uploader
 
-# Run with custom config file
+# 使用自定义配置文件
 ./cos-uploader -config /path/to/config.yaml
 
-# Display version
+# 查看版本
 ./cos-uploader --version
 ```
 
-## Configuration Parameters
+### 3. 查看日志
 
-### Global Level
-- **log_path** (optional): Path to the log file. Can be relative or absolute path. Default: `logs/cos-uploader.log`
-
-### Project Level
-- **name** (required): Project name for identification
-- **directories** (required): List of local directories to monitor (will recursively watch subdirectories)
-- **cos**: COS bucket configuration
-- **watcher**: File monitoring configuration
-- **alert**: Alert notification configuration
-
-### COS Configuration
-- **secret_id** (required): Tencent Cloud COS API Secret ID
-- **secret_key** (required): Tencent Cloud COS API Secret Key
-- **region** (optional): COS region, default: ap-shanghai
-- **bucket** (required): COS bucket name
-- **path_prefix** (required): Path prefix for remote files
-
-### Watcher Configuration
-- **events** (optional): File events to monitor. Options: `create`, `write`, `remove`, `rename`, `chmod`. Default: `[create, write]`
-- **pool_size** (optional): Number of concurrent upload workers. Default: 5
-
-### Alert Configuration
-- **dingtalk_webhook** (optional): DingTalk robot webhook URL
-- **enabled** (optional): Enable/disable alert notifications. Default: false
-
-## Logging
-
-The application supports flexible logging configuration:
-
-### Application Logs
-Configured via `log_path` in `config.yaml`:
-```yaml
-log_path: /opt/cos-uploader/logs/cos-uploader.log
+```bash
+# 实时查看日志
+tail -f /opt/cos-uploader/logs/cos-uploader.log
 ```
 
-- **Default path**: `logs/cos-uploader.log` (relative to working directory)
-- **Absolute path**: `/opt/cos-uploader/logs/cos-uploader.log` (full path)
-- **Supports environment paths**: `~/logs/app.log` (will be expanded)
+## 📖 详细配置
 
-### Console Output
-- Real-time output to stdout (INFO level and above)
+### 全局配置
 
-### Troubleshooting Logs
-When running with LaunchAgent on macOS, additional logs are available:
-- **stdout**: `~/Library/Logs/cos-uploader/stdout.log`
-- **stderr**: `~/Library/Logs/cos-uploader/stderr.log`
+| 配置项 | 说明 | 默认值 | 必需 |
+|--------|------|--------|------|
+| `log_path` | 日志文件路径（相对或绝对路径） | `logs/cos-uploader.log` | 否 |
 
-## Directory Structure (Recommended)
+### 项目配置
+
+| 配置项 | 说明 | 必需 |
+|--------|------|------|
+| `name` | 项目名称，用于识别 | 是 |
+| `directories` | 要监控的本地目录列表（将递归监控子目录） | 是 |
+| `cos` | COS 桶配置 | 是 |
+| `watcher` | 文件监控配置 | 是 |
+| `alert` | 告警通知配置 | 否 |
+
+### COS 配置
+
+| 配置项 | 说明 | 默认值 | 必需 |
+|--------|------|--------|------|
+| `secret_id` | 腾讯云 COS API Secret ID | - | 是 |
+| `secret_key` | 腾讯云 COS API Secret Key | - | 是 |
+| `region` | COS 地域 | `ap-shanghai` | 否 |
+| `bucket` | COS 桶名称 | - | 是 |
+| `path_prefix` | 远程文件路径前缀 | - | 是 |
+
+### 监控配置
+
+| 配置项 | 说明 | 默认值 | 必需 |
+|--------|------|--------|------|
+| `events` | 要监控的文件事件 | `[create, write]` | 否 |
+| `pool_size` | 并发上传工作线程数 | `5` | 否 |
+
+**支持的事件类型**：`create`、`write`、`remove`、`rename`、`chmod`
+
+### 告警配置
+
+| 配置项 | 说明 | 默认值 | 必需 |
+|--------|------|--------|------|
+| `dingtalk_webhook` | 钉钉机器人 webhook URL | - | 否 |
+| `enabled` | 是否启用告警通知 | `false` | 否 |
+
+## 🔧 使用指南
+
+### 推荐目录结构
 
 ```
 /opt/cos-uploader/
-├── cos-uploader           # Application binary
-├── config.yaml            # Configuration file
+├── cos-uploader           # 应用程序
+├── config.yaml            # 配置文件
 └── logs/
-    └── cos-uploader.log   # Application logs
+    └── cos-uploader.log   # 应用日志
 ```
 
-This structure keeps all application files in one place for easy management.
+此结构将所有应用文件集中在一处，便于管理。
 
-## macOS Installation
+### macOS 部署（LaunchAgent）
 
-For a complete setup guide on macOS with LaunchAgent, see [MACOS_BACKGROUND_SETUP.md](./MACOS_BACKGROUND_SETUP.md).
+完整的 macOS 设置指南请参见 [MACOS_BACKGROUND_SETUP.md](./docs/MACOS_BACKGROUND_SETUP.md)。
 
-Quick setup:
+快速设置：
+
 ```bash
 chmod +x setup-macos.sh
 ./setup-macos.sh
 ```
 
-## Linux Installation
+### Linux 部署（systemd）
 
-See [BUILD_GUIDE.md](./BUILD_GUIDE.md) for Linux/systemd setup instructions.
+详见 [BUILD_GUIDE.md](./docs/BUILD_GUIDE.md) 中的 Linux/systemd 设置说明。
 
-## Architecture
+## 📊 架构说明
 
 ```
-File Change Event
+文件变化事件
       ↓
    fsnotify
       ↓
-Event Filtering (by type)
+事件过滤（按类型）
       ↓
-Upload Queue (buffered: 1000 tasks)
+上传队列（缓冲：1000 个任务）
       ↓
-Worker Pool (configurable concurrent workers)
+工作线程池（可配置并发数）
       ↓
-COS Upload API
+COS 上传 API
       ↓
-Success / Retry (up to 3 times)
+成功 / 重试（最多 3 次）
       ↓
-DingTalk Alert (on failure)
+钉钉告警（失败时）
 ```
 
-## Module Structure
+### 模块结构
 
-- **config**: Configuration management, validation, and YAML parsing
-- **logger**: Flexible structured logging to stdout and configurable file paths
-- **watcher**: File system monitoring using fsnotify with recursive directory support
-- **uploader**: COS upload engine with worker pool, retry logic, and full upload capability
-- **alert**: DingTalk notification integration for upload failures
-- **main**: Application orchestration, signal handling, and lifecycle management
+- **config**：配置管理、验证和 YAML 解析
+- **logger**：灵活的结构化日志记录，支持输出到标准输出和自定义文件路径
+- **watcher**：使用 fsnotify 进行文件系统监控，支持递归目录监控
+- **uploader**：COS 上传引擎，包括工作线程池、重试逻辑和完整的上传能力
+- **alert**：钉钉通知集成，用于上传失败时的告警
+- **main**：应用程序编排、信号处理和生命周期管理
 
-## System Requirements
+## 📝 日志配置
 
-- Go 1.21 or higher
-- Network access to Tencent Cloud COS API
-- (Optional) DingTalk workspace for alerts
-- (Optional) systemd (Linux) or LaunchAgent (macOS) for background running
+应用支持灵活的日志配置：
 
-## Dependencies
+### 应用日志
 
-- **fsnotify** (v1.9.0): File system notifications
-- **cos-go-sdk-v5** (v0.7.72): Tencent Cloud COS SDK
-- **zap** (v1.27.1): Structured logging (used for logger foundation)
-- **yaml.v3** (v3.0.1): YAML parsing
+通过 `config.yaml` 中的 `log_path` 配置：
 
-## Error Handling
+```yaml
+log_path: /opt/cos-uploader/logs/cos-uploader.log
+```
 
-The application includes robust error handling:
-- Failed uploads automatically retry up to 3 times
-- Failed retries are logged with detailed error messages
-- Graceful shutdown on system signals (SIGINT, SIGTERM)
-- All operations logged for debugging and monitoring
-- Automatic recovery from temporary network failures
+- **默认路径**：`logs/cos-uploader.log`（相对于工作目录）
+- **绝对路径**：`/opt/cos-uploader/logs/cos-uploader.log`（完整路径）
 
-## Performance Tuning
+### 控制台输出
 
-### Increasing Upload Concurrency
-Adjust `pool_size` in watcher configuration:
+- 实时输出到标准输出（INFO 级别及以上）
+
+### 故障排查日志
+
+在 macOS 的 LaunchAgent 中运行时，可查看以下日志：
+
+- **stdout**：`~/Library/Logs/cos-uploader/stdout.log`
+- **stderr**：`~/Library/Logs/cos-uploader/stderr.log`
+
+## 🔍 问题排查
+
+### 文件未上传
+
+1. 查看日志：`tail -f /opt/cos-uploader/logs/cos-uploader.log`
+2. 验证 `config.yaml` 中的 COS 凭证
+3. 确保监控目录存在且可访问
+4. 检查网络连接到腾讯云
+5. 验证文件事件与配置的 `events` 列表匹配
+
+### CPU 占用率高
+
+- 减少 `pool_size` 如果监控大型目录时 CPU 占用过高
+- 增加事件过滤以排除不需要的事件
+- 检查监控目录中是否有过多文件变化
+
+### 应用频繁崩溃或重启
+
+1. 查看应用日志以获取错误信息
+2. 检查 LaunchAgent stderr 日志（macOS）：`tail -f ~/Library/Logs/cos-uploader/stderr.log`
+3. 验证配置文件语法：`./cos-uploader -config config.yaml`
+4. 检查系统资源（磁盘空间、内存）
+
+## 🛠️ 性能优化
+
+### 增加上传并发数
+
+调整监控配置中的 `pool_size`：
+
 ```yaml
 watcher:
-  pool_size: 10  # Increase to 10 concurrent uploads
+  pool_size: 10  # 增加到 10 个并发上传
 ```
 
-### Monitoring Multiple Large Directories
-Consider creating separate projects to parallelize monitoring:
+### 监控多个大型目录
+
+考虑创建多个项目来并行化监控：
+
 ```yaml
 projects:
   - name: project1
@@ -234,41 +282,30 @@ projects:
       - /data/dir2
 ```
 
-### Customizing Log Location
+### 自定义日志位置
+
 ```yaml
 log_path: /var/log/cos-uploader/app.log
 ```
 
-## Troubleshooting
+## 📄 文档
 
-### Files not uploading
-1. Check logs: `tail -f /opt/cos-uploader/logs/cos-uploader.log`
-2. Verify COS credentials in `config.yaml`
-3. Ensure monitored directories exist and are accessible
-4. Check network connectivity to Tencent Cloud
-5. Verify file events match the configured `events` list
+- [MACOS_BACKGROUND_SETUP.md](./docs/MACOS_BACKGROUND_SETUP.md) - macOS LaunchAgent 设置和配置指南
+- [BUILD_GUIDE.md](./docs/BUILD_GUIDE.md) - 从源码编译和跨平台编译指南
+- [CLAUDE.md](./CLAUDE.md) - 开发者文档和架构详解
+- [CHANGELOG.md](./CHANGELOG.md) - 版本历史和变更记录
 
-### High CPU usage
-- Reduce `pool_size` if monitoring large directories with many files
-- Increase event filtering if not needed events are being processed
-- Check for excessive file churn in monitored directories
+## 🔗 关键依赖
 
-### Application crashes or frequent restarts
-1. Review application logs for errors
-2. Check LaunchAgent stderr logs (macOS): `tail -f ~/Library/Logs/cos-uploader/stderr.log`
-3. Verify configuration file syntax with: `./cos-uploader -config config.yaml`
-4. Check system resources (disk space, memory)
+- **fsnotify** (v1.9.0)：文件系统事件监控
+- **cos-go-sdk-v5** (v0.7.72)：腾讯云 COS API 客户端
+- **zap** (v1.27.1)：结构化日志库
+- **yaml.v3** (v3.0.1)：YAML 解析库
 
-## Documentation
-
-- [MACOS_BACKGROUND_SETUP.md](./MACOS_BACKGROUND_SETUP.md) - macOS LaunchAgent setup and configuration
-- [BUILD_GUIDE.md](./BUILD_GUIDE.md) - Building from source and cross-compilation
-- [CLAUDE.md](./CLAUDE.md) - Development guide and architecture details
-
-## License
+## 📄 许可证
 
 MIT
 
-## Support
+## 💬 支持与反馈
 
-For issues, questions, or contributions, please refer to the project repository.
+如有问题或建议，请参考项目仓库进行反馈。

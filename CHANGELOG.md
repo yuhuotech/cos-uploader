@@ -1,92 +1,92 @@
-# Changelog
+# 变更日志
 
-All notable changes to this project will be documented in this file.
+项目的所有重要变更都记录在此文件中。
 
 ## [1.0.1] - 2026-01-21
 
-### 🔧 Bug Fixes
+### 🔧 错误修复
 
-- **Fixed frequent application restarts on macOS**
-  - Root cause: `eventsChan` was not being closed in `watcher.Close()` method
-  - Impact: Application would hang during graceful shutdown, causing LaunchAgent to repeatedly restart it
-  - Solution: Added proper channel closure in watcher module
-  - Files: `watcher/watcher.go`
+- **修复 macOS 上应用频繁重启的问题**
+  - 根本原因：`watcher.Close()` 方法未关闭 `eventsChan`
+  - 影响：应用在优雅关闭时挂起，导致 LaunchAgent 反复重启
+  - 解决方案：在 watcher 模块中添加正确的通道关闭
+  - 文件：`watcher/watcher.go`
 
-### ✨ New Features
+### ✨ 新增特性
 
-- **Configurable log file path via YAML**
-  - Add `log_path` field to config.yaml for custom log locations
-  - Supports both relative and absolute paths
-  - Default: `logs/cos-uploader.log` if not configured
-  - Files: `config/config.go`, `logger/logger.go`, `main.go`
+- **通过 YAML 配置自定义日志文件路径**
+  - 在 config.yaml 中添加 `log_path` 字段以指定自定义日志位置
+  - 支持相对路径和绝对路径
+  - 默认：未配置时使用 `logs/cos-uploader.log`
+  - 文件：`config/config.go`、`logger/logger.go`、`main.go`
 
-- **Enhanced logger module**
-  - New `NewLoggerWithPath(logPath string)` function for custom paths
-  - Maintains backward compatibility with `NewLogger()`
-  - Automatic log directory creation
-  - Files: `logger/logger.go`
+- **增强日志模块**
+  - 新增 `NewLoggerWithPath(logPath string)` 函数用于自定义路径
+  - 保持与 `NewLogger()` 的向后兼容性
+  - 自动创建日志目录
+  - 文件：`logger/logger.go`
 
-### 📁 Directory Structure Improvements
+### 📁 目录结构改进
 
-- **Standardized installation directory**
-  - Recommended: `/opt/cos-uploader/`
-  - Structure:
+- **标准化安装目录**
+  - 推荐：`/opt/cos-uploader/`
+  - 目录结构：
     ```
     /opt/cos-uploader/
-    ├── cos-uploader           # Application binary
-    ├── config.yaml            # Configuration file
+    ├── cos-uploader           # 应用程序
+    ├── config.yaml            # 配置文件
     └── logs/
-        └── cos-uploader.log   # Application logs
+        └── cos-uploader.log   # 应用日志
     ```
-  - All application files centralized in one location
-  - Improved maintainability and management
+  - 所有应用文件集中在一处
+  - 提高可维护性和管理便利性
 
-### 📚 Documentation Updates
+### 📚 文档更新
 
 - **MACOS_BACKGROUND_SETUP.md**
-  - Complete rewrite for new `/opt/cos-uploader/` directory structure
-  - Added detailed log configuration guide
-  - Improved troubleshooting section
-  - Updated setup script to use new paths
-  - Added log directory and configuration explanations
+  - 完全重写以适配新的 `/opt/cos-uploader/` 目录结构
+  - 添加详细的日志配置指南
+  - 改进故障排查部分
+  - 更新安装脚本使用新路径
+  - 添加日志目录和配置说明
 
 - **README.md**
-  - Added `log_path` configuration documentation
-  - Added directory structure section
-  - Enhanced logging section with path configuration
-  - Improved troubleshooting for application crashes
+  - 添加 `log_path` 配置文档
+  - 添加目录结构章节
+  - 增强日志配置部分及路径配置说明
+  - 改进应用崩溃问题的故障排查
 
-- **BUILD_GUIDE.md** (to be updated)
-  - Will reflect new build paths and installation locations
+- **BUILD_GUIDE.md**（待更新）
+  - 将反映新的构建路径和安装位置
 
-### 🔨 Implementation Details
+### 🔨 实现细节
 
-#### Changes to Config Module
+#### Config 模块的变更
 ```go
 type Config struct {
     Projects []ProjectConfig `yaml:"projects"`
-    LogPath  string          `yaml:"log_path"` // NEW
+    LogPath  string          `yaml:"log_path"` // 新增
 }
 ```
 
-#### Changes to Logger Module
+#### Logger 模块的变更
 ```go
-// NEW: Support custom log paths
+// 新增：支持自定义日志路径
 func NewLoggerWithPath(logPath string) *Logger {
     logDir := filepath.Dir(logPath)
     os.MkdirAll(logDir, 0755)
-    // ... create log file
+    // ... 创建日志文件
 }
 
-// EXISTING: Maintained for backward compatibility
+// 现有：为向后兼容性保留
 func NewLogger() *Logger {
     return NewLoggerWithPath("logs/cos-uploader.log")
 }
 ```
 
-#### Changes to Main Module
+#### Main 模块的变更
 ```go
-// NEW: Load config first, then initialize logger with config's log path
+// 新增：先加载配置，然后用配置的日志路径初始化日志
 cfg, err := config.LoadConfig(*configPath)
 if err != nil {
     println("Failed to load config:", err)
@@ -101,9 +101,9 @@ if cfg.LogPath != "" {
 }
 ```
 
-#### Changes to Watcher Module
+#### Watcher 模块的变更
 ```go
-// FIXED: Properly close eventsChan on shutdown
+// 修复：在关闭时正确关闭 eventsChan
 func (w *Watcher) Close() error {
     w.mu.Lock()
     if w.closed {
@@ -116,18 +116,18 @@ func (w *Watcher) Close() error {
     close(w.done)
     time.Sleep(100 * time.Millisecond)
 
-    // NEW: Close eventsChan to allow main loop to exit
+    // 新增：关闭 eventsChan 以允许主循环退出
     close(w.eventsChan)
 
     return w.watcher.Close()
 }
 ```
 
-### 🚀 Migration Guide
+### 🚀 迁移指南
 
-Users upgrading from v1.0.0 to v1.0.1:
+从 v1.0.0 升级到 v1.0.1 的用户：
 
-1. **Update configuration file** - Add `log_path` at the top:
+1. **更新配置文件** - 在最前面添加 `log_path`：
    ```yaml
    log_path: /opt/cos-uploader/logs/cos-uploader.log
 
@@ -135,7 +135,7 @@ Users upgrading from v1.0.0 to v1.0.1:
      - name: ...
    ```
 
-2. **Optional: Migrate to new directory structure**
+2. **可选：迁移到新的目录结构**
    ```bash
    mkdir -p /opt/cos-uploader
    cp cos-uploader /opt/cos-uploader/
@@ -143,58 +143,57 @@ Users upgrading from v1.0.0 to v1.0.1:
    mkdir -p /opt/cos-uploader/logs
    ```
 
-3. **Update LaunchAgent (macOS only)**
+3. **更新 LaunchAgent（仅 macOS）**
    ```xml
    <string>/opt/cos-uploader/cos-uploader</string>
    <string>/opt/cos-uploader/config.yaml</string>
    <string>/opt/cos-uploader</string>  <!-- WorkingDirectory -->
    ```
 
-4. **Reload application**
+4. **重新加载应用**
    ```bash
    launchctl stop com.hmw.cos-uploader
    launchctl start com.hmw.cos-uploader
    ```
 
-### ⚠️ Known Issues
+### ⚠️ 已知问题
 
-- None at this time
+- 暂无
 
-### 📋 Testing Notes
+### 📋 测试备注
 
-- ✅ Application tested on macOS with LaunchAgent
-- ✅ Tested with custom log paths (both relative and absolute)
-- ✅ Verified graceful shutdown works correctly
-- ✅ Confirmed no more frequent restarts
-- ✅ File monitoring and uploading working normally
+- ✅ 在 macOS 上使用 LaunchAgent 进行了完整测试
+- ✅ 使用自定义日志路径（相对和绝对）进行了测试
+- ✅ 验证了优雅关闭工作正常
+- ✅ 确认不再出现频繁重启
+- ✅ 文件监控和上传功能正常运行
 
-### 🙏 Credits
+### 🙏 致谢
 
-- Fixed by: Development team
-- Tested on: macOS 12.x+
-- Go version: 1.21+
+- 修复者：开发团队
+- 测试环境：macOS 12.x+
+- Go 版本：1.21+
 
 ---
 
 ## [1.0.0] - 2026-01-20
 
-### Initial Release
+### 🎉 首次发布
 
-- Real-time file monitoring using fsnotify
-- Multi-project support with separate COS buckets
-- Concurrent file upload with worker pool
-- Automatic retry mechanism (3 attempts)
-- DingTalk webhook notifications for failures
-- Structured JSON logging to stdout and files
-- Comprehensive error handling
-- Graceful shutdown support
+- 使用 fsnotify 实现实时文件监控
+- 多项目支持，每个项目拥有独立的 COS 桶
+- 并发文件上传与工作线程池
+- 自动重试机制（3 次尝试）
+- DingTalk webhook 失败通知
+- 结构化 JSON 日志记录到 stdout 和文件
 
-### Features
-- Recursive directory monitoring
-- Configurable upload concurrency
-- Event-based filtering (create, write, remove, rename, chmod)
-- Full upload capability with progress tracking
-- Index-based upload deduplication
-- Cross-platform support (Linux, macOS, Windows)
-- GitHub Actions CI/CD pipeline
-- GoReleaser automated builds
+### ✨ 特性
+
+- 递归目录监控
+- 可配置的上传并发数
+- 基于事件的过滤（create、write、remove、rename、chmod）
+- 完整的上传能力和进度跟踪
+- 基于索引的上传去重
+- 跨平台支持（Linux、macOS、Windows）
+- GitHub Actions CI/CD 流水线
+- GoReleaser 自动化构建
